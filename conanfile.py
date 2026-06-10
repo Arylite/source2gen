@@ -33,6 +33,10 @@ class pkgRecipe(ConanFile):
 
     settings = "os", "compiler", "build_type", "arch"
 
+    def validate(self):
+        from conan.tools.build import check_min_cppstd
+        check_min_cppstd(self, 17)
+
     exports_sources = "CMakeLists.txt", "source2gen/*"
 
     def layout(self):
