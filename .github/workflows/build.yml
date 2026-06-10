@@ -1,0 +1,82 @@
+name: Build & Release
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+jobs:
+  build:
+    name: Build
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Conan
+        run: pip install conan
+
+      - name: Detect Conan profile
+        run: conan profile detect --force
+
+      - name: Install dependencies
+        run: conan install . -o "game=CS2" --build=missing -s build_type=Release
+
+      - name: Configure CMake
+        run: >
+          cmake -S . -B build
+          -DCMAKE_BUILD_TYPE=Release
+          -DSOURCE2GEN_GAME=CS2
+          -DCMAKE_TOOLCHAIN_FILE=build/Release/generators/conan_toolchain.cmake
+
+      - name: Build
+        run: cmake --build build --config Release --parallel
+
+      - name: Collect artifacts (Windows)
+        run: |
+          New-Item -ItemType Directory -Force artifacts | Out-Null
+          Copy-Item build\bin\Release\source2gen.exe artifacts\source2gen-win-x64.exe -ErrorAction SilentlyContinue
+          Copy-Item build\bin\Release\source2gen-loader.dll artifacts\source2gen-loader-win-x64.dll -ErrorAction SilentlyContinue
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: source2gen-CS2-${{ matrix.os }}
+          path: artifacts/
+          if-no-files-found: warn
+
+  release:
+    name: Create Release
+    needs: build
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release-artifacts
+          merge-multiple: true
+
+      - name: Create or update rolling release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: latest
+          name: "Latest build (${{ github.sha }})"
+          body: |
+            Automated build from commit ${{ github.sha }}
+
+            **Branch:** ${{ github.ref_name }}
+            **Commit:** ${{ github.sha }}
+            **Message:** ${{ github.event.head_commit.message }}
+          files: release-artifacts/**
+          prerelease: false
+          make_latest: true
