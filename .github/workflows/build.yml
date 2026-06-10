@@ -27,11 +27,11 @@ jobs:
         run: conan install . -o "game=CS2" --build=missing -s build_type=Release -s compiler.cppstd=17
 
       - name: Configure CMake
-        run: >
-          cmake -S . -B build
-          -DCMAKE_BUILD_TYPE=Release
-          -DSOURCE2GEN_GAME=CS2
-          -DCMAKE_TOOLCHAIN_FILE=build/Release/generators/conan_toolchain.cmake
+        run: |
+          cmake -S . -B build `
+            -DCMAKE_BUILD_TYPE=Release `
+            -DSOURCE2GEN_GAME=CS2 `
+            "-DCMAKE_TOOLCHAIN_FILE=build/Release/generators/conan_toolchain.cmake"
 
       - name: Build
         run: cmake --build build --config Release --parallel
